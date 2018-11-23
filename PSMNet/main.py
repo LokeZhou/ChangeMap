@@ -30,7 +30,7 @@ parser.add_argument('--loadmodel', default= None,
                     help='load model')
 parser.add_argument('--savemodel', default='./',
                     help='save model')
-parser.add_argument('--no-cuda', action='store_true', default=False,
+parser.add_argument('--enablecuda',  default=False,
                     help='enables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
@@ -39,11 +39,12 @@ parser.add_argument('--testheight', type=int, default=512, metavar='S',
 parser.add_argument('--testweight', type=int, default=512, metavar='S',
                     help='test sample pixed weight (default: 512)')
 args = parser.parse_args()
-args.cuda = not args.no_cuda and torch.cuda.is_available()
+args.cuda = args.enablecuda and torch.cuda.is_available()
+
 
 torch.manual_seed(args.seed)
-#if args.cuda:
-#    torch.cuda.manual_seed(args.seed)
+if args.cuda:
+    torch.cuda.manual_seed(args.seed)
 
 all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp = lt.dataloader(args.datapath)
 
@@ -57,15 +58,15 @@ TestImgLoader = torch.utils.data.DataLoader(
 
 
 if args.model == 'stackhourglass':
-    model = stackhourglass(args.maxdisp)
+    model = stackhourglass(args.cuda,args.maxdisp)
 elif args.model == 'basic':
-    model = basic(args.maxdisp)
+    model = basic(args.cuda,args.maxdisp)
 else:
     print('no model')
 
-#if args.cuda:
-#    model = nn.DataParallel(model)
-#    model.cuda()
+if args.cuda:
+    model = nn.DataParallel(model)
+    model.cuda()
 
 if args.loadmodel is not None:
     state_dict = torch.load(args.loadmodel)
@@ -82,8 +83,8 @@ def train(imgL,imgR, disp_L):
         disp_L = Variable(torch.FloatTensor(disp_L))
 
         disp_true = disp_L
-        #if args.cuda:
-        #    imgL, imgR, disp_true = imgL.cuda(), imgR.cuda(), disp_L.cuda()
+        if args.cuda:
+            imgL, imgR, disp_true = imgL.cuda(), imgR.cuda(), disp_L.cuda()
 
        #---------
         mask = disp_true < args.maxdisp
@@ -104,8 +105,6 @@ def train(imgL,imgR, disp_L):
             output = torch.squeeze(output3,1)
             #loss = F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True)
             loss = F.smooth_l1_loss(output3, disp_true, size_average=True)
-            print("loss")
-            print(loss)
 
         loss.backward()
         optimizer.step()
@@ -117,8 +116,8 @@ def test(imgL,imgR,disp_true):
         model.eval()
         imgL   = Variable(torch.FloatTensor(imgL))
         imgR   = Variable(torch.FloatTensor(imgR))   
-        #if args.cuda:
-        #    imgL, imgR = imgL.cuda(), imgR.cuda()
+        if args.cuda:
+            imgL, imgR = imgL.cuda(), imgR.cuda()
 
         #---------
         #mask = disp_true < 192
