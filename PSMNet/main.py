@@ -34,21 +34,25 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='enables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
+parser.add_argument('--testheight', type=int, default=512, metavar='S',
+                    help='test sample pixed height (default: 512)')
+parser.add_argument('--testweight', type=int, default=512, metavar='S',
+                    help='test sample pixed weight (default: 512)')
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
 torch.manual_seed(args.seed)
-if args.cuda:
-    torch.cuda.manual_seed(args.seed)
+#if args.cuda:
+#    torch.cuda.manual_seed(args.seed)
 
 all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp = lt.dataloader(args.datapath)
 
 TrainImgLoader = torch.utils.data.DataLoader(
-         DA.myImageFloder(all_left_img,all_right_img,all_left_disp, True), 
+         DA.myImageFloder(all_left_img,all_right_img,all_left_disp, True,args.testweight,args.testheight),
          batch_size= 12, shuffle= True, num_workers= 8, drop_last=False)
 
 TestImgLoader = torch.utils.data.DataLoader(
-         DA.myImageFloder(test_left_img,test_right_img,test_left_disp, False), 
+         DA.myImageFloder(test_left_img,test_right_img,test_left_disp, False,args.testweight,args.testheight),
          batch_size= 8, shuffle= False, num_workers= 4, drop_last=False)
 
 
@@ -59,9 +63,9 @@ elif args.model == 'basic':
 else:
     print('no model')
 
-if args.cuda:
-    model = nn.DataParallel(model)
-    model.cuda()
+#if args.cuda:
+#    model = nn.DataParallel(model)
+#    model.cuda()
 
 if args.loadmodel is not None:
     state_dict = torch.load(args.loadmodel)
@@ -77,8 +81,9 @@ def train(imgL,imgR, disp_L):
         imgR   = Variable(torch.FloatTensor(imgR))   
         disp_L = Variable(torch.FloatTensor(disp_L))
 
-        if args.cuda:
-            imgL, imgR, disp_true = imgL.cuda(), imgR.cuda(), disp_L.cuda()
+        disp_true = disp_L
+        #if args.cuda:
+        #    imgL, imgR, disp_true = imgL.cuda(), imgR.cuda(), disp_L.cuda()
 
        #---------
         mask = disp_true < args.maxdisp
@@ -91,38 +96,45 @@ def train(imgL,imgR, disp_L):
             output1 = torch.squeeze(output1,1)
             output2 = torch.squeeze(output2,1)
             output3 = torch.squeeze(output3,1)
-            loss = 0.5*F.smooth_l1_loss(output1[mask], disp_true[mask], size_average=True) + 0.7*F.smooth_l1_loss(output2[mask], disp_true[mask], size_average=True) + F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True) 
+            #loss = 0.5*F.smooth_l1_loss(output1[mask], disp_true[mask], size_average=True) + 0.7*F.smooth_l1_loss(output2[mask], disp_true[mask], size_average=True) + F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True)
+            loss = 0.5 * F.smooth_l1_loss(output1, disp_true, size_average=True) + 0.7 * F.smooth_l1_loss(
+                output2, disp_true, size_average=True) + F.smooth_l1_loss(output3, disp_true, size_average=True)
         elif args.model == 'basic':
             output3 = model(imgL,imgR)
             output = torch.squeeze(output3,1)
-            loss = F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True)
+            #loss = F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True)
+            loss = F.smooth_l1_loss(output3, disp_true, size_average=True)
+            print("loss")
+            print(loss)
 
         loss.backward()
         optimizer.step()
 
-        return loss.data[0]
+        #return loss.data[0]
+        return loss.item()
 
 def test(imgL,imgR,disp_true):
         model.eval()
         imgL   = Variable(torch.FloatTensor(imgL))
         imgR   = Variable(torch.FloatTensor(imgR))   
-        if args.cuda:
-            imgL, imgR = imgL.cuda(), imgR.cuda()
+        #if args.cuda:
+        #    imgL, imgR = imgL.cuda(), imgR.cuda()
 
         #---------
-        mask = disp_true < 192
+        #mask = disp_true < 192
         #----
 
         with torch.no_grad():
             output3 = model(imgL,imgR)
 
-        output = torch.squeeze(output3.data.cpu(),1)[:,4:,:]
+        #output = torch.squeeze(output3.data.cpu(),1)[:,4:,:]
+        output = torch.squeeze(output3.data.cpu(), 1)[:, :, :]
 
-        if len(disp_true[mask])==0:
+        if len(disp_true)==0:
            loss = 0
         else:
-           loss = torch.mean(torch.abs(output[mask]-disp_true[mask]))  # end-point-error
-
+           #loss = torch.mean(torch.abs(output[mask]-disp_true[mask]))  # end-point-error
+           loss = torch.mean(torch.abs(output - disp_true))  # end-point-error
         return loss
 
 def adjust_learning_rate(optimizer, epoch):
