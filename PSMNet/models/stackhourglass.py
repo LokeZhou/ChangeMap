@@ -144,17 +144,17 @@ class PSMNet(nn.Module):
 		cost2 = F.upsample(cost2, [self.maxdisp,left.size()[2],left.size()[3]], mode='trilinear')
 
 		cost1 = torch.squeeze(cost1,1)
-		pred1 = F.softmax(cost1,dim=1)
-		pred1 = disparityregression(self.maxdisp)(pred1)
+		#pred1 = F.softmax(cost1,dim=1)
+		pred1 = disparityregression(self.maxdisp)(cost1)
 
 		cost2 = torch.squeeze(cost2,1)
-		pred2 = F.softmax(cost2,dim=1)
-		pred2 = disparityregression(self.maxdisp)(pred2)
+		#pred2 = F.softmax(cost2,dim=1)
+		pred2 = disparityregression(self.maxdisp)(cost2)
 
         cost3 = F.upsample(cost3, [self.maxdisp,left.size()[2],left.size()[3]], mode='trilinear')
         cost3 = torch.squeeze(cost3,1)
-        pred3 = F.softmax(cost3,dim=1)
-        pred3 = disparityregression(self.maxdisp)(pred3)
+        #pred3 = F.softmax(cost3,dim=1)
+        pred3 = disparityregression(self.maxdisp)(cost3)
 
         if self.training:
             return pred1, pred2, pred3

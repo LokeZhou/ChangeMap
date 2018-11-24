@@ -38,6 +38,10 @@ parser.add_argument('--testheight', type=int, default=512, metavar='S',
                     help='test sample pixed height (default: 512)')
 parser.add_argument('--testweight', type=int, default=512, metavar='S',
                     help='test sample pixed weight (default: 512)')
+parser.add_argument('--trainbatchsize', type=int, default=12, metavar='S',
+                    help='train batch size (default: 12)')
+parser.add_argument('--testbatchsize', type=int, default=8, metavar='S',
+                    help='test batch size (default: 8)')
 args = parser.parse_args()
 args.cuda = args.enablecuda and torch.cuda.is_available()
 
@@ -50,11 +54,11 @@ all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_
 
 TrainImgLoader = torch.utils.data.DataLoader(
          DA.myImageFloder(all_left_img,all_right_img,all_left_disp, True,args.testweight,args.testheight),
-         batch_size= 12, shuffle= True, num_workers= 8, drop_last=False)
+         batch_size= args.trainbatchsize, shuffle= True, num_workers= 8, drop_last=False)
 
 TestImgLoader = torch.utils.data.DataLoader(
          DA.myImageFloder(test_left_img,test_right_img,test_left_disp, False,args.testweight,args.testheight),
-         batch_size= 8, shuffle= False, num_workers= 4, drop_last=False)
+         batch_size= args.testbatchsize, shuffle= False, num_workers= 4, drop_last=False)
 
 
 if args.model == 'stackhourglass':

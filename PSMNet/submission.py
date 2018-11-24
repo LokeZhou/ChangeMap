@@ -33,33 +33,31 @@ parser.add_argument('--model', default='stackhourglass',
                     help='select model')
 parser.add_argument('--maxdisp', type=int, default=192,
                     help='maxium disparity')
-parser.add_argument('--no-cuda', action='store_true', default=False,
+parser.add_argument('--enablecuda',  default=False,
                     help='enables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 args = parser.parse_args()
-args.cuda = not args.no_cuda and torch.cuda.is_available()
+args.cuda = args.enablecuda and torch.cuda.is_available()
 
 torch.manual_seed(args.seed)
-#if args.cuda:
-#    torch.cuda.manual_seed(args.seed)
-
-#if args.KITTI == '2015':
-#   from dataloader import KITTI_submission_loader as DA
-#else:
+if args.cuda:
+    torch.cuda.manual_seed(args.seed)
 
 
 test_left_img, test_right_img = DA.dataloader(args.datapath)
 
+
 if args.model == 'stackhourglass':
-    model = stackhourglass(args.maxdisp)
+    model = stackhourglass(args.cuda,args.maxdisp)
 elif args.model == 'basic':
-    model = basic(args.maxdisp)
+    model = basic(args.cuda,args.maxdisp)
 else:
     print('no model')
 
-#model = nn.DataParallel(model, device_ids=[0])
-#model.cuda()
+if args.cuda:
+   model = nn.DataParallel(model, device_ids=[0])
+   model.cuda()
 
 if args.loadmodel is not None:
     state_dict = torch.load(args.loadmodel)
@@ -70,12 +68,13 @@ print('Number of model parameters: {}'.format(sum([p.data.nelement() for p in mo
 def test(imgL,imgR):
         model.eval()
 
-        #if args.cuda:
-        #   imgL = torch.FloatTensor(imgL).cuda()
-        #   imgR = torch.FloatTensor(imgR).cuda()
+        if args.cuda:
+           imgL = torch.FloatTensor(imgL).cuda()
+           imgR = torch.FloatTensor(imgR).cuda()
+        else:
+           imgL = torch.FloatTensor(imgL)
+           imgR = torch.FloatTensor(imgR)
 
-        imgL = torch.FloatTensor(imgL)
-        imgR = torch.FloatTensor(imgR)
         imgL, imgR= Variable(imgL), Variable(imgR)
 
         with torch.no_grad():
