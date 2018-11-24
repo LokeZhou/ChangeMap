@@ -103,12 +103,29 @@ class myImageFloder(data.Dataset):
            w, h = left_img.size
            left_img = left_img.crop((w-self.testWeight, h-self.testHeight, w, h))
            right_img = right_img.crop((w-self.testWeight, h-self.testHeight, w, h))
-           processed = preprocess.get_transform(augment=False)  
-           left_img       = processed(left_img)
-           right_img      = processed(right_img)
+
+           bands = len(left_img.getbands())
+
+           left_img = np.array(left_img)
+           right_img = np.array(right_img)
+
+           left_img_tensor = np.zeros((bands, self.testHeight, self.testWeight), dtype=float)
+           right_img_tensor = np.zeros((bands, self.testHeight, self.testWeight), dtype=float)
+
+           for i in range(bands):
+               left_img_tensor[i, :, :] = left_img[:, :, i] / 255.0
+               right_img_tensor[i, :, :] = right_img[:, :, i] / 255.0
+
+           left_img_tensor = Variable(torch.FloatTensor(left_img_tensor))
+           right_img_tensor = Variable(torch.FloatTensor(right_img_tensor))
 
 
-           return left_img, right_img, dataL
+           #processed = preprocess.get_transform(augment=False)
+           #left_img       = processed(left_img)
+           #right_img      = processed(right_img)
+
+
+           return left_img_tensor, right_img_tensor, dataL
 
     def __len__(self):
         return len(self.left)

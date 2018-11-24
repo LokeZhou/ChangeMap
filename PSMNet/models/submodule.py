@@ -63,8 +63,10 @@ class disparityregression(nn.Module):
     def forward(self, x):
         #disp = self.disp.repeat(x.size()[0],1,x.size()[2],x.size()[3])
         #out = torch.sum(x*disp,1)
+
         out = torch.mean(x, 1)
-        out = F.softmax(out)
+        out = F.softmax(out,1)
+
         return out
 
 class feature_extraction(nn.Module):
