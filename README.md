@@ -1,10 +1,13 @@
 # ChangeMap
 
 Usage
+
 Dependencies
+
 Python2.7
 PyTorch(0.4.0+)
 torchvision 0.2.0 (higher version may cause issues)
+
 
 
 Train
