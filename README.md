@@ -16,6 +16,8 @@ As an example, use the following command to train a PSMNet on Your Dataset:
 python main.py --maxdisp 192 \
                --model stackhourglass \
                --datapath (your data folder)\
+               --trainbatchsize 5
+               --testbatchsize 8
                --epochs 10 \
                —-enablecuda True \ 
                --savemodel (path for saving model)
