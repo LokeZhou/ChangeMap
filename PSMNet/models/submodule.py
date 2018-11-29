@@ -57,15 +57,15 @@ class disparityregression(nn.Module):
     def __init__(self, maxdisp):
         super(disparityregression, self).__init__()
         #self.disp = Variable(torch.Tensor(np.reshape(np.array(range(maxdisp)),[1,maxdisp,1,1])).cuda(), requires_grad=False)
-        #self.disp = Variable(torch.Tensor(np.reshape(np.array(range(maxdisp)), [1, maxdisp, 1, 1])),requires_grad=False)
+        self.disp = Variable(torch.Tensor(np.reshape(np.array(range(maxdisp)), [1, maxdisp, 1, 1])),requires_grad=False)
         self.maxdisp = maxdisp
 
     def forward(self, x):
-        #disp = self.disp.repeat(x.size()[0],1,x.size()[2],x.size()[3])
-        #out = torch.sum(x*disp,1)
+        disp = self.disp.repeat(x.size()[0],1,x.size()[2],x.size()[3])
+        out = torch.sum(x*disp,1)
+        out = out / self.maxdisp
 
-        out = torch.mean(x, 1)
-        out = F.softmax(out,1)
+
 
         return out
 

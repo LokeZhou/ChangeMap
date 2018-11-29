@@ -13,7 +13,9 @@ torchvision 0.2.0 (higher version may cause issues)
 Train
 As an example, use the following command to train a PSMNet on Your Dataset:
 
-python main.py --maxdisp 192 \
+preTrain
+
+python main.py --maxdisp 4 \
                --model stackhourglass \
                --datapath (your data folder)\
                --trainbatchsize 5
@@ -21,6 +23,17 @@ python main.py --maxdisp 192 \
                --epochs 10 \
                —-enablecuda True \ 
                --savemodel (path for saving model)
+               
+fineTrani
+
+python finetune.py --maxdisp 4 \
+              --model stackhourglass \
+              --datapath (your fine data folder)
+             --savemodel (path for saving model)
+             --epochs 300
+             --enablecuda True 
+             --loadmodel (path for pre train model)
+
 
 Tip:
 1.Make sure your dataset file construction as :

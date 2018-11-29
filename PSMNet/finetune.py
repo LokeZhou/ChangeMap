@@ -16,55 +16,60 @@ import skimage.transform
 import numpy as np
 import time
 import math
-from dataloader import KITTIloader2015 as ls
-from dataloader import KITTILoader as DA
+
+from dataloader import listflowfile as ls
+from dataloader import SecenFlowLoader as DA
 
 from models import *
+
 
 parser = argparse.ArgumentParser(description='PSMNet')
 parser.add_argument('--maxdisp', type=int ,default=192,
                     help='maxium disparity')
 parser.add_argument('--model', default='stackhourglass',
                     help='select model')
-parser.add_argument('--datatype', default='2015',
+parser.add_argument('--datapath', default='/media/jiaren/ImageNet/SceneFlowData/',
                     help='datapath')
-parser.add_argument('--datapath', default='/media/jiaren/ImageNet/data_scene_flow_2015/training/',
-                    help='datapath')
-parser.add_argument('--epochs', type=int, default=300,
+parser.add_argument('--epochs', type=int, default=10,
                     help='number of epochs to train')
-parser.add_argument('--loadmodel', default='./trained/submission_model.tar',
+parser.add_argument('--loadmodel', default= None,
                     help='load model')
 parser.add_argument('--savemodel', default='./',
                     help='save model')
-parser.add_argument('--no-cuda', action='store_true', default=False,
+parser.add_argument('--enablecuda',  default=False,
                     help='enables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
+parser.add_argument('--testheight', type=int, default=512, metavar='S',
+                    help='test sample pixed height (default: 512)')
+parser.add_argument('--testweight', type=int, default=512, metavar='S',
+                    help='test sample pixed weight (default: 512)')
+parser.add_argument('--trainbatchsize', type=int, default=12, metavar='S',
+                    help='train batch size (default: 12)')
+parser.add_argument('--testbatchsize', type=int, default=8, metavar='S',
+                    help='test batch size (default: 8)')
+
 args = parser.parse_args()
-args.cuda = not args.no_cuda and torch.cuda.is_available()
+args.cuda = args.enablecuda and torch.cuda.is_available()
 torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
-if args.datatype == '2015':
-   from dataloader import KITTIloader2015 as ls
-elif args.datatype == '2012':
-   from dataloader import KITTIloader2012 as ls
 
 all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(args.datapath)
 
 TrainImgLoader = torch.utils.data.DataLoader(
-         DA.myImageFloder(all_left_img,all_right_img,all_left_disp, True), 
+         DA.myImageFloder(all_left_img,all_right_img,all_left_disp, True,args.testweight,args.testheight),
          batch_size= 12, shuffle= True, num_workers= 8, drop_last=False)
 
 TestImgLoader = torch.utils.data.DataLoader(
-         DA.myImageFloder(test_left_img,test_right_img,test_left_disp, False), 
+         DA.myImageFloder(test_left_img,test_right_img,test_left_disp, False,args.testweight,args.testheight),
          batch_size= 8, shuffle= False, num_workers= 4, drop_last=False)
 
 if args.model == 'stackhourglass':
-    model = stackhourglass(args.maxdisp)
+    model = stackhourglass(args.cuda,args.maxdisp)
 elif args.model == 'basic':
-    model = basic(args.maxdisp)
+    model = basic(args.cuda,args.maxdisp)
 else:
     print('no model')
 
@@ -89,6 +94,7 @@ def train(imgL,imgR,disp_L):
         if args.cuda:
             imgL, imgR, disp_true = imgL.cuda(), imgR.cuda(), disp_L.cuda()
 
+        disp_true = disp_L
         #---------
         mask = (disp_true > 0)
         mask.detach_()
@@ -101,11 +107,14 @@ def train(imgL,imgR,disp_L):
             output1 = torch.squeeze(output1,1)
             output2 = torch.squeeze(output2,1)
             output3 = torch.squeeze(output3,1)
-            loss = 0.5*F.smooth_l1_loss(output1[mask], disp_true[mask], size_average=True) + 0.7*F.smooth_l1_loss(output2[mask], disp_true[mask], size_average=True) + F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True) 
+            #loss = 0.5*F.smooth_l1_loss(output1[mask], disp_true[mask], size_average=True) + 0.7*F.smooth_l1_loss(output2[mask], disp_true[mask], size_average=True) + F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True)
+            loss = 0.5 * F.smooth_l1_loss(output1, disp_true, size_average=True) + 0.7 * F.smooth_l1_loss(
+                output2, disp_true, size_average=True) + F.smooth_l1_loss(output3, disp_true, size_average=True)
         elif args.model == 'basic':
             output = model(imgL,imgR)
-            output = torch.squeeze(output3,1)
-            loss = F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True)
+            output = torch.squeeze(output,1)
+            #loss = F.smooth_l1_loss(output[mask], disp_true[mask], size_average=True)
+            loss = F.smooth_l1_loss(output, disp_true, size_average=True)
 
         loss.backward()
         optimizer.step()
@@ -128,8 +137,9 @@ def test(imgL,imgR,disp_true):
         true_disp = disp_true
         index = np.argwhere(true_disp>0)
         disp_true[index[0][:], index[1][:], index[2][:]] = np.abs(true_disp[index[0][:], index[1][:], index[2][:]]-pred_disp[index[0][:], index[1][:], index[2][:]])
-        correct = (disp_true[index[0][:], index[1][:], index[2][:]] < 3)|(disp_true[index[0][:], index[1][:], index[2][:]] < true_disp[index[0][:], index[1][:], index[2][:]]*0.05)      
-        torch.cuda.empty_cache()
+        correct = (disp_true[index[0][:], index[1][:], index[2][:]] < 3)|(disp_true[index[0][:], index[1][:], index[2][:]] < true_disp[index[0][:], index[1][:], index[2][:]]*0.05)
+        if args.cuda:
+           torch.cuda.empty_cache()
 
         return 1-(float(torch.sum(correct))/float(len(index[0])))
 

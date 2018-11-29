@@ -116,7 +116,7 @@ def main():
            img = pred_disp
        else:
            img = pred_disp[top_pad:,:-left_pad]
-       skimage.io.imsave(test_left_img[inx].split('/')[-1],(img*255).astype('uint16'))
+       skimage.io.imsave(test_left_img[inx].split('/')[-1],(img*255).astype('uint8'))
 
 if __name__ == '__main__':
    main()

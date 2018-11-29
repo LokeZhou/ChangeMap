@@ -26,6 +26,7 @@ def default_loader(path):
         return rt.readImage(path)
     else:
         return Image.open(path).convert('RGB')
+        #return Image.open(path).convert('L')
 
 def disparity_loader(path):
     patharray = np.array([path])
@@ -74,18 +75,25 @@ class myImageFloder(data.Dataset):
 
            dataL = dataL[y1:y1 + th, x1:x1 + tw]
 
+
            bands = len(left_img.getbands())
 
            left_img = np.array(left_img)
            right_img = np.array(right_img)
 
 
+
            left_img_tensor = np.zeros((bands,th,tw),dtype = float)
            right_img_tensor = np.zeros((bands, th, tw), dtype=float)
 
+
            for i in range(bands):
-               left_img_tensor[i,:,:] = left_img[:,:,i] / 255.0
-               right_img_tensor[i,:,:] = right_img[:,:,i] /255.0
+               if bands == 1:
+                   left_img_tensor[i, :, :] = left_img[:, :] / 255.0
+                   right_img_tensor[i, :, :] = right_img[:, :] / 255.0
+               else:
+                   left_img_tensor[i,:,:] = left_img[:,:,i] / 255.0
+                   right_img_tensor[i,:,:] = right_img[:,:,i] /255.0
 
 
 
