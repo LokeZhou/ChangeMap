@@ -24,7 +24,7 @@ python main.py --maxdisp 4 \
                —-enablecuda True \ 
                --savemodel (path for saving model)
                
-fineTrani
+fineTrain
 
 python finetune.py --maxdisp 4 \
               --model stackhourglass \
