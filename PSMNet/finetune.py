@@ -2,6 +2,7 @@ from __future__ import print_function
 import argparse
 import os
 import random
+import ast
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -36,7 +37,7 @@ parser.add_argument('--loadmodel', default= None,
                     help='load model')
 parser.add_argument('--savemodel', default='./',
                     help='save model')
-parser.add_argument('--enablecuda',  default=False,
+parser.add_argument('--enablecuda', type=ast.literal_eval, default=False,
                     help='enables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
@@ -50,30 +51,34 @@ parser.add_argument('--testbatchsize', type=int, default=8, metavar='S',
                     help='test batch size (default: 8)')
 
 args = parser.parse_args()
-args.cuda = args.enablecuda and torch.cuda.is_available()
-torch.manual_seed(args.seed)
-if args.cuda:
+#args.cuda = args.enablecuda and torch.cuda.is_available()
+enablecuda = torch.cuda.is_available() and args.enablecuda
+
+
+if enablecuda:
     torch.cuda.manual_seed(args.seed)
+else:
+    torch.manual_seed(args.seed)
 
 
 all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp = ls.dataloader(args.datapath)
 
 TrainImgLoader = torch.utils.data.DataLoader(
          DA.myImageFloder(all_left_img,all_right_img,all_left_disp, True,args.testweight,args.testheight),
-         batch_size= 12, shuffle= True, num_workers= 8, drop_last=False)
+         batch_size= args.trainbatchsize, shuffle= True, num_workers= 8, drop_last=False)
 
 TestImgLoader = torch.utils.data.DataLoader(
          DA.myImageFloder(test_left_img,test_right_img,test_left_disp, False,args.testweight,args.testheight),
-         batch_size= 8, shuffle= False, num_workers= 4, drop_last=False)
+         batch_size= args.testbatchsize, shuffle= False, num_workers= 4, drop_last=False)
 
 if args.model == 'stackhourglass':
-    model = stackhourglass(args.cuda,args.maxdisp)
+    model = stackhourglass(enablecuda,args.maxdisp)
 elif args.model == 'basic':
-    model = basic(args.cuda,args.maxdisp)
+    model = basic(enablecuda,args.maxdisp)
 else:
     print('no model')
 
-if args.cuda:
+if enablecuda:
     model = nn.DataParallel(model)
     model.cuda()
 
@@ -91,10 +96,12 @@ def train(imgL,imgR,disp_L):
         imgR   = Variable(torch.FloatTensor(imgR))   
         disp_L = Variable(torch.FloatTensor(disp_L))
 
-        if args.cuda:
+        disp_true = disp_L
+
+        if enablecuda:
             imgL, imgR, disp_true = imgL.cuda(), imgR.cuda(), disp_L.cuda()
 
-        disp_true = disp_L
+
         #---------
         mask = (disp_true > 0)
         mask.detach_()
@@ -119,13 +126,14 @@ def train(imgL,imgR,disp_L):
         loss.backward()
         optimizer.step()
 
-        return loss.data[0]
+        #return loss.data[0]
+        return loss.item()
 
 def test(imgL,imgR,disp_true):
         model.eval()
         imgL   = Variable(torch.FloatTensor(imgL))
         imgR   = Variable(torch.FloatTensor(imgR))   
-        if args.cuda:
+        if enablecuda:
             imgL, imgR = imgL.cuda(), imgR.cuda()
 
         with torch.no_grad():
@@ -138,7 +146,7 @@ def test(imgL,imgR,disp_true):
         index = np.argwhere(true_disp>0)
         disp_true[index[0][:], index[1][:], index[2][:]] = np.abs(true_disp[index[0][:], index[1][:], index[2][:]]-pred_disp[index[0][:], index[1][:], index[2][:]])
         correct = (disp_true[index[0][:], index[1][:], index[2][:]] < 3)|(disp_true[index[0][:], index[1][:], index[2][:]] < true_disp[index[0][:], index[1][:], index[2][:]]*0.05)
-        if args.cuda:
+        if enablecuda:
            torch.cuda.empty_cache()
 
         return 1-(float(torch.sum(correct))/float(len(index[0])))

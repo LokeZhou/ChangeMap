@@ -2,6 +2,7 @@ from __future__ import print_function
 import argparse
 import os
 import random
+import ast
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -16,6 +17,10 @@ import math
 from dataloader import listflowfile as lt
 from dataloader import SecenFlowLoader as DA
 from models import *
+from tensorboardX import SummaryWriter
+
+
+
 
 parser = argparse.ArgumentParser(description='PSMNet')
 parser.add_argument('--maxdisp', type=int ,default=192,
@@ -30,7 +35,7 @@ parser.add_argument('--loadmodel', default= None,
                     help='load model')
 parser.add_argument('--savemodel', default='./',
                     help='save model')
-parser.add_argument('--enablecuda',  default=False,
+parser.add_argument('--enablecuda', type=ast.literal_eval, default=False,
                     help='enables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
@@ -43,12 +48,13 @@ parser.add_argument('--trainbatchsize', type=int, default=12, metavar='S',
 parser.add_argument('--testbatchsize', type=int, default=8, metavar='S',
                     help='test batch size (default: 8)')
 args = parser.parse_args()
-args.cuda = args.enablecuda and torch.cuda.is_available()
+enablecuda =  torch.cuda.is_available() and args.enablecuda
 
 
-torch.manual_seed(args.seed)
-if args.cuda:
+if enablecuda:
     torch.cuda.manual_seed(args.seed)
+else:
+    torch.manual_seed(args.seed)
 
 all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp = lt.dataloader(args.datapath)
 
@@ -62,15 +68,16 @@ TestImgLoader = torch.utils.data.DataLoader(
 
 
 if args.model == 'stackhourglass':
-    model = stackhourglass(args.cuda,args.maxdisp)
+    model = stackhourglass(enablecuda,args.maxdisp)
 elif args.model == 'basic':
-    model = basic(args.cuda,args.maxdisp)
+    model = basic(enablecuda,args.maxdisp)
 else:
     print('no model')
 
-if args.cuda:
+if enablecuda:
     model = nn.DataParallel(model)
     model.cuda()
+
 
 if args.loadmodel is not None:
     state_dict = torch.load(args.loadmodel)
@@ -87,8 +94,9 @@ def train(imgL,imgR, disp_L):
         disp_L = Variable(torch.FloatTensor(disp_L))
 
         disp_true = disp_L
-        if args.cuda:
+        if enablecuda:
             imgL, imgR, disp_true = imgL.cuda(), imgR.cuda(), disp_L.cuda()
+
 
        #---------
         mask = disp_true < args.maxdisp
@@ -120,7 +128,7 @@ def test(imgL,imgR,disp_true):
         model.eval()
         imgL   = Variable(torch.FloatTensor(imgL))
         imgR   = Variable(torch.FloatTensor(imgR))   
-        if args.cuda:
+        if enablecuda:
             imgL, imgR = imgL.cuda(), imgR.cuda()
 
         #---------
@@ -155,6 +163,9 @@ def main():
 	   total_train_loss = 0
 	   adjust_learning_rate(optimizer,epoch)
 
+
+
+
 	   ## training ##
 	   for batch_idx, (imgL_crop, imgR_crop, disp_crop_L) in enumerate(TrainImgLoader):
 	     start_time = time.time()
@@ -163,6 +174,7 @@ def main():
 	     print('Iter %d training loss = %.3f , time = %.2f' %(batch_idx, loss, time.time() - start_time))
 	     total_train_loss += loss
 	   print('epoch %d total training loss = %.3f' %(epoch, total_train_loss/len(TrainImgLoader)))
+
 
 	   #SAVE
 	   savefilename = args.savemodel+'/checkpoint_'+str(epoch)+'.tar'

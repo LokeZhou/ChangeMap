@@ -2,6 +2,7 @@ from __future__ import print_function
 import argparse
 import os
 import random
+import ast
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -33,29 +34,30 @@ parser.add_argument('--model', default='stackhourglass',
                     help='select model')
 parser.add_argument('--maxdisp', type=int, default=192,
                     help='maxium disparity')
-parser.add_argument('--enablecuda',  default=False,
+parser.add_argument('--enablecuda', type=ast.literal_eval, default=False,
                     help='enables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 args = parser.parse_args()
-args.cuda = args.enablecuda and torch.cuda.is_available()
+enablecuda =  torch.cuda.is_available() and args.enablecuda
 
-torch.manual_seed(args.seed)
-if args.cuda:
+
+if enablecuda:
     torch.cuda.manual_seed(args.seed)
-
+else:
+    torch.manual_seed(args.seed)
 
 test_left_img, test_right_img = DA.dataloader(args.datapath)
 
 
 if args.model == 'stackhourglass':
-    model = stackhourglass(args.cuda,args.maxdisp)
+    model = stackhourglass(enablecuda,args.maxdisp)
 elif args.model == 'basic':
-    model = basic(args.cuda,args.maxdisp)
+    model = basic(enablecuda,args.maxdisp)
 else:
     print('no model')
 
-if args.cuda:
+if enablecuda:
    model = nn.DataParallel(model, device_ids=[0])
    model.cuda()
 
@@ -68,7 +70,7 @@ print('Number of model parameters: {}'.format(sum([p.data.nelement() for p in mo
 def test(imgL,imgR):
         model.eval()
 
-        if args.cuda:
+        if enablecuda:
            imgL = torch.FloatTensor(imgL).cuda()
            imgR = torch.FloatTensor(imgR).cuda()
         else:
@@ -107,6 +109,7 @@ def main():
 
        start_time = time.time()
        pred_disp = test(imgL,imgR)
+
        print('time = %.2f' %(time.time() - start_time))
 
        top_pad   = 512-imgL_o.shape[0]

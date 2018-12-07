@@ -82,7 +82,6 @@ class myImageFloder(data.Dataset):
            right_img = np.array(right_img)
 
 
-
            left_img_tensor = np.zeros((bands,th,tw),dtype = float)
            right_img_tensor = np.zeros((bands, th, tw), dtype=float)
 
@@ -121,8 +120,13 @@ class myImageFloder(data.Dataset):
            right_img_tensor = np.zeros((bands, self.testHeight, self.testWeight), dtype=float)
 
            for i in range(bands):
-               left_img_tensor[i, :, :] = left_img[:, :, i] / 255.0
-               right_img_tensor[i, :, :] = right_img[:, :, i] / 255.0
+               if bands == 1:
+                   left_img_tensor[i, :, :] = left_img[:, :] / 255.0
+                   right_img_tensor[i, :, :] = right_img[:, :] / 255.0
+               else:
+                   left_img_tensor[i,:,:] = left_img[:,:,i] / 255.0
+                   right_img_tensor[i,:,:] = right_img[:,:,i] /255.0
+
 
            left_img_tensor = Variable(torch.FloatTensor(left_img_tensor))
            right_img_tensor = Variable(torch.FloatTensor(right_img_tensor))

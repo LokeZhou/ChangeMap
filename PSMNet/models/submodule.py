@@ -54,10 +54,12 @@ class matchshifted(nn.Module):
         return out
 
 class disparityregression(nn.Module):
-    def __init__(self, maxdisp):
+    def __init__(self, maxdisp,cudaenable):
         super(disparityregression, self).__init__()
-        #self.disp = Variable(torch.Tensor(np.reshape(np.array(range(maxdisp)),[1,maxdisp,1,1])).cuda(), requires_grad=False)
-        self.disp = Variable(torch.Tensor(np.reshape(np.array(range(maxdisp)), [1, maxdisp, 1, 1])),requires_grad=False)
+        if cudaenable == True:
+           self.disp = Variable(torch.Tensor(np.reshape(np.array(range(maxdisp)),[1,maxdisp,1,1])).cuda(), requires_grad=False)
+        else:
+           self.disp = Variable(torch.Tensor(np.reshape(np.array(range(maxdisp)), [1, maxdisp, 1, 1])),requires_grad=False)
         self.maxdisp = maxdisp
 
     def forward(self, x):
