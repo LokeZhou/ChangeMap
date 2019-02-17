@@ -6,12 +6,14 @@ import torchvision.transforms as transforms
 from torch.autograd import Variable
 import random
 from PIL import Image, ImageOps
-import preprocess 
-import listflowfile as lt
-import readpfm as rp
+from .preprocess import *
+from .listflowfile import *
+from .readTif import *
+from .readpfm import *
 import numpy as np
-import readTif as rt
 
+import skimage
+import skimage.io
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
     '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP','tif','TIF',
@@ -23,7 +25,7 @@ def is_image_file(filename):
 def default_loader(path):
     patharray = np.array([path])
     if patharray[0][-4:] == '.tif' or patharray[0][-4:] == '.TIF':
-        return rt.readImage(path)
+        return readImage(path)
     else:
         return Image.open(path).convert('RGB')
         #return Image.open(path).convert('L')
@@ -31,9 +33,9 @@ def default_loader(path):
 def disparity_loader(path):
     patharray = np.array([path])
     if patharray[0][-4:] != '.pfm' or patharray[0][-4:] == '.PFM':
-        return rt.readTrue(path)
+        return readTrue(path)
     else:
-        return rp.readPFM(path)
+        return readPFM(path)
 
 
 class myImageFloder(data.Dataset):
@@ -61,14 +63,16 @@ class myImageFloder(data.Dataset):
 
 
 
+
         if self.training:  
            w, h = left_img.size
            #th, tw = 512, 512
-           th, tw = 256, 256
+           th, tw = 256,256
 
  
            x1 = random.randint(0, w - tw)
            y1 = random.randint(0, h - th)
+
 
            left_img = left_img.crop((x1, y1, x1 + tw, y1 + th))
            right_img = right_img.crop((x1, y1, x1 + tw, y1 + th))
@@ -76,7 +80,7 @@ class myImageFloder(data.Dataset):
            dataL = dataL[y1:y1 + th, x1:x1 + tw]
 
 
-           bands = len(left_img.getbands())
+           '''bands = len(left_img.getbands())
 
            left_img = np.array(left_img)
            right_img = np.array(right_img)
@@ -98,20 +102,21 @@ class myImageFloder(data.Dataset):
 
            left_img_tensor = Variable(torch.FloatTensor(left_img_tensor))
            right_img_tensor = Variable(torch.FloatTensor(right_img_tensor))
+           '''
+
+           processed = get_transform(augment=False)
+           left_img   = processed(left_img)
+           right_img  = processed(right_img)
 
 
-           #processed = preprocess.get_transform(augment=False)
-           #left_img   = processed(left_img)
-           #right_img  = processed(right_img)
-
-
-           return left_img_tensor, right_img_tensor, dataL
+           #return left_img_tensor, right_img_tensor, dataL
+           return left_img, right_img, dataL
         else:
            w, h = left_img.size
            left_img = left_img.crop((w-self.testWeight, h-self.testHeight, w, h))
            right_img = right_img.crop((w-self.testWeight, h-self.testHeight, w, h))
 
-           bands = len(left_img.getbands())
+           '''bands = len(left_img.getbands())
 
            left_img = np.array(left_img)
            right_img = np.array(right_img)
@@ -130,14 +135,15 @@ class myImageFloder(data.Dataset):
 
            left_img_tensor = Variable(torch.FloatTensor(left_img_tensor))
            right_img_tensor = Variable(torch.FloatTensor(right_img_tensor))
+           '''
+
+           processed = get_transform(augment=False)
+           left_img       = processed(left_img)
+           right_img      = processed(right_img)
 
 
-           #processed = preprocess.get_transform(augment=False)
-           #left_img       = processed(left_img)
-           #right_img      = processed(right_img)
-
-
-           return left_img_tensor, right_img_tensor, dataL
+           #return left_img_tensor, right_img_tensor, dataL
+           return left_img, right_img, dataL
 
     def __len__(self):
         return len(self.left)

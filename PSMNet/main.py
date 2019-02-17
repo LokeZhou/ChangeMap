@@ -20,8 +20,6 @@ from models import *
 from tensorboardX import SummaryWriter
 
 
-
-
 parser = argparse.ArgumentParser(description='PSMNet')
 parser.add_argument('--maxdisp', type=int ,default=192,
                     help='maxium disparity')
@@ -71,6 +69,10 @@ if args.model == 'stackhourglass':
     model = stackhourglass(enablecuda,args.maxdisp)
 elif args.model == 'basic':
     model = basic(enablecuda,args.maxdisp)
+elif args.model =='fullyLayer':
+    model = fullyLayer(enablecuda)
+elif args.model == 'graphLayer':
+    model = graphLayer(enablecuda)
 else:
     print('no model')
 
@@ -109,14 +111,26 @@ def train(imgL,imgR, disp_L):
             output1 = torch.squeeze(output1,1)
             output2 = torch.squeeze(output2,1)
             output3 = torch.squeeze(output3,1)
-            #loss = 0.5*F.smooth_l1_loss(output1[mask], disp_true[mask], size_average=True) + 0.7*F.smooth_l1_loss(output2[mask], disp_true[mask], size_average=True) + F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True)
-            loss = 0.5 * F.smooth_l1_loss(output1, disp_true, size_average=True) + 0.7 * F.smooth_l1_loss(
-                output2, disp_true, size_average=True) + F.smooth_l1_loss(output3, disp_true, size_average=True)
+            loss = 0.3 * F.smooth_l1_loss(output1, disp_true, size_average=True) + 0.3 * F.smooth_l1_loss(
+                output2, disp_true, size_average=True) + 0.3*F.smooth_l1_loss(output3, disp_true, size_average=True)
         elif args.model == 'basic':
             output3 = model(imgL,imgR)
             output = torch.squeeze(output3,1)
             #loss = F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True)
             loss = F.smooth_l1_loss(output3, disp_true, size_average=True)
+        elif args.model == 'fullyLayer':
+            output3 = model(imgL, imgR)
+            output = torch.squeeze(output3, 1)
+            # loss = F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True)
+            loss = F.smooth_l1_loss(output3, disp_true, size_average=True)
+        elif args.model == 'graphLayer':
+            output1, output2, output3 = model(imgL, imgR)
+            output1 = torch.squeeze(output1, 1)
+            output2 = torch.squeeze(output2, 1)
+            output3 = torch.squeeze(output3, 1)
+            # loss = 0.5*F.smooth_l1_loss(output1[mask], disp_true[mask], size_average=True) + 0.7*F.smooth_l1_loss(output2[mask], disp_true[mask], size_average=True) + F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True)
+            loss = 0.3 * F.smooth_l1_loss(output1, disp_true, size_average=True) + 0.3 * F.smooth_l1_loss(
+                output2, disp_true, size_average=True) + 0.4 * F.smooth_l1_loss(output3, disp_true, size_average=True)
 
         loss.backward()
         optimizer.step()
@@ -146,6 +160,7 @@ def test(imgL,imgR,disp_true):
         else:
            #loss = torch.mean(torch.abs(output[mask]-disp_true[mask]))  # end-point-error
            loss = torch.mean(torch.abs(output - disp_true))  # end-point-error
+           #loss = torch.sum(torch.abs(output - disp_true))
         return loss
 
 def adjust_learning_rate(optimizer, epoch):
@@ -157,50 +172,54 @@ def adjust_learning_rate(optimizer, epoch):
 
 def main():
 
-	start_full_time = time.time()
-	for epoch in range(1, args.epochs+1):
-	   print('This is %d-th epoch' %(epoch))
-	   total_train_loss = 0
-	   adjust_learning_rate(optimizer,epoch)
+    start_full_time = time.time()
+    writer = SummaryWriter('runs')
+    min_Loss = 10000.0
+    min_epoch = 0;
+    for epoch in range(1, args.epochs+1):
+       print('This is %d-th epoch' %(epoch))
+       total_train_loss = 0
+       adjust_learning_rate(optimizer,epoch)
 
+       ## training ##
+       for batch_idx, (imgL_crop, imgR_crop, disp_crop_L) in enumerate(TrainImgLoader):
+           start_time = time.time()
+           loss = train(imgL_crop,imgR_crop, disp_crop_L)
+           print('Iter %d training loss = %.3f , time = %.2f' %(batch_idx, loss, time.time() - start_time))
+           total_train_loss += loss
+       print('epoch %d total training loss = %.3f' %(epoch, total_train_loss/len(TrainImgLoader)))
+       writer.add_scalar('train_loss',total_train_loss/len(TrainImgLoader),epoch)
+       if (total_train_loss/len(TrainImgLoader)) < min_Loss:
+           min_Loss = total_train_loss/len(TrainImgLoader)
+           min_epoch = epoch
 
-
-
-	   ## training ##
-	   for batch_idx, (imgL_crop, imgR_crop, disp_crop_L) in enumerate(TrainImgLoader):
-	     start_time = time.time()
-
-	     loss = train(imgL_crop,imgR_crop, disp_crop_L)
-	     print('Iter %d training loss = %.3f , time = %.2f' %(batch_idx, loss, time.time() - start_time))
-	     total_train_loss += loss
-	   print('epoch %d total training loss = %.3f' %(epoch, total_train_loss/len(TrainImgLoader)))
-
-
-	   #SAVE
-	   savefilename = args.savemodel+'/checkpoint_'+str(epoch)+'.tar'
-	   torch.save({
+       #SAVE
+       savefilename = args.savemodel+'/checkpoint_'+str(epoch)+'.tar'
+       torch.save({
 		    'epoch': epoch,
 		    'state_dict': model.state_dict(),
                     'train_loss': total_train_loss/len(TrainImgLoader),
 		}, savefilename)
 
-	print('full training time = %.2f HR' %((time.time() - start_full_time)/3600))
+    print('full training time = %.2f HR' %((time.time() - start_full_time)/3600))
+    writer.close()
 
-	#------------- TEST ------------------------------------------------------------
-	total_test_loss = 0
-	for batch_idx, (imgL, imgR, disp_L) in enumerate(TestImgLoader):
-	       test_loss = test(imgL,imgR, disp_L)
-	       print('Iter %d test loss = %.3f' %(batch_idx, test_loss))
-	       total_test_loss += test_loss
+    #------------- TEST ------------------------------------------------------------
+    '''total_test_loss = 0
+    for batch_idx, (imgL, imgR, disp_L) in enumerate(TestImgLoader):
+        test_loss = test(imgL,imgR, disp_L)
+        print('Iter %d test loss = %.3f' %(batch_idx, test_loss))
+        total_test_loss += test_loss
 
-	print('total test loss = %.3f' %(total_test_loss/len(TestImgLoader)))
-	#----------------------------------------------------------------------------------
+    print('total test loss = %.3f' %(total_test_loss/len(TestImgLoader)))
+    #----------------------------------------------------------------------------------
 	#SAVE test information
-	savefilename = args.savemodel+'testinformation.tar'
-	torch.save({
+    savefilename = args.savemodel+'testinformation.tar'
+    torch.save({
 		    'test_loss': total_test_loss/len(TestImgLoader),
 		}, savefilename)
-
+    '''
+    print('min_loss epoch = %d' %(min_epoch))
 
 if __name__ == '__main__':
    main()

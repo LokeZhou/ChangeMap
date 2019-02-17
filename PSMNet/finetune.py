@@ -20,6 +20,7 @@ import math
 
 from dataloader import listflowfile as ls
 from dataloader import SecenFlowLoader as DA
+from tensorboardX import SummaryWriter
 
 from models import *
 
@@ -75,6 +76,10 @@ if args.model == 'stackhourglass':
     model = stackhourglass(enablecuda,args.maxdisp)
 elif args.model == 'basic':
     model = basic(enablecuda,args.maxdisp)
+elif args.model =='fullyLayer':
+    model = fullyLayer(enablecuda)
+elif args.model == 'graphLayer':
+    model = graphLayer(enablecuda)
 else:
     print('no model')
 
@@ -115,13 +120,26 @@ def train(imgL,imgR,disp_L):
             output2 = torch.squeeze(output2,1)
             output3 = torch.squeeze(output3,1)
             #loss = 0.5*F.smooth_l1_loss(output1[mask], disp_true[mask], size_average=True) + 0.7*F.smooth_l1_loss(output2[mask], disp_true[mask], size_average=True) + F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True)
-            loss = 0.5 * F.smooth_l1_loss(output1, disp_true, size_average=True) + 0.7 * F.smooth_l1_loss(
-                output2, disp_true, size_average=True) + F.smooth_l1_loss(output3, disp_true, size_average=True)
+            loss = 0.3 * F.smooth_l1_loss(output1, disp_true, size_average=True) + 0.3 * F.smooth_l1_loss(
+                output2, disp_true, size_average=True) + 0.3 * F.smooth_l1_loss(output3, disp_true, size_average=True)
         elif args.model == 'basic':
             output = model(imgL,imgR)
             output = torch.squeeze(output,1)
             #loss = F.smooth_l1_loss(output[mask], disp_true[mask], size_average=True)
             loss = F.smooth_l1_loss(output, disp_true, size_average=True)
+        elif args.model == 'fullyLayer':
+            output3 = model(imgL, imgR)
+            output = torch.squeeze(output3, 1)
+            # loss = F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True)
+            loss = F.smooth_l1_loss(output3, disp_true, size_average=True)
+        elif args.model == 'graphLayer':
+            output1, output2, output3 = model(imgL, imgR)
+            output1 = torch.squeeze(output1, 1)
+            output2 = torch.squeeze(output2, 1)
+            output3 = torch.squeeze(output3, 1)
+            # loss = 0.5*F.smooth_l1_loss(output1[mask], disp_true[mask], size_average=True) + 0.7*F.smooth_l1_loss(output2[mask], disp_true[mask], size_average=True) + F.smooth_l1_loss(output3[mask], disp_true[mask], size_average=True)
+            loss = 0.3 * F.smooth_l1_loss(output1, disp_true, size_average=True) + 0.3 * F.smooth_l1_loss(
+                output2, disp_true, size_average=True) + 0.4 * F.smooth_l1_loss(output3, disp_true, size_average=True)
 
         loss.backward()
         optimizer.step()
@@ -162,50 +180,53 @@ def adjust_learning_rate(optimizer, epoch):
 
 
 def main():
-	max_acc=0
-	max_epo=0
-	start_full_time = time.time()
 
-	for epoch in range(1, args.epochs+1):
-	   total_train_loss = 0
-	   total_test_loss = 0
-	   adjust_learning_rate(optimizer,epoch)
-           
-               ## training ##
-           for batch_idx, (imgL_crop, imgR_crop, disp_crop_L) in enumerate(TrainImgLoader):
-               start_time = time.time() 
-
-               loss = train(imgL_crop,imgR_crop, disp_crop_L)
-	       print('Iter %d training loss = %.3f , time = %.2f' %(batch_idx, loss, time.time() - start_time))
-	       total_train_loss += loss
-	   print('epoch %d total training loss = %.3f' %(epoch, total_train_loss/len(TrainImgLoader)))
-	   
-               ## Test ##
-
-           for batch_idx, (imgL, imgR, disp_L) in enumerate(TestImgLoader):
-               test_loss = test(imgL,imgR, disp_L)
-               print('Iter %d 3-px error in val = %.3f' %(batch_idx, test_loss*100))
-               total_test_loss += test_loss
+    max_acc=0
+    max_epo=0
+    start_full_time = time.time()
+    writer = SummaryWriter('runs')
+    for epoch in range(1, args.epochs+1):
+       total_train_loss = 0
+       total_test_loss = 0
+       adjust_learning_rate(optimizer,epoch)
 
 
-	   print('epoch %d total 3-px error in val = %.3f' %(epoch, total_test_loss/len(TestImgLoader)*100))
-	   if total_test_loss/len(TestImgLoader)*100 > max_acc:
-		max_acc = total_test_loss/len(TestImgLoader)*100
-		max_epo = epoch
-	   print('MAX epoch %d total test error = %.3f' %(max_epo, max_acc))
+       ## training ##
+       for batch_idx, (imgL_crop, imgR_crop, disp_crop_L) in enumerate(TrainImgLoader):
+           start_time = time.time()
+           loss = train(imgL_crop,imgR_crop, disp_crop_L)
+           print('Iter %d training loss = %.3f , time = %.2f' %(batch_idx, loss, time.time() - start_time))
+           total_train_loss += loss
+       print('epoch %d total training loss = %.3f' %(epoch, total_train_loss/len(TrainImgLoader)))
+       writer.add_scalar('train_loss', total_train_loss / len(TrainImgLoader), epoch)
 
-	   #SAVE
-	   savefilename = args.savemodel+'finetune_'+str(epoch)+'.tar'
-	   torch.save({
+       ## Test ##
+       for batch_idx, (imgL, imgR, disp_L) in enumerate(TestImgLoader):
+           test_loss = test(imgL,imgR, disp_L)
+           print('Iter %d 3-px error in val = %.3f' %(batch_idx, test_loss*100))
+           total_test_loss += test_loss
+
+
+       print('epoch %d total 3-px error in val = %.3f' %(epoch, total_test_loss/len(TestImgLoader)*100))
+       if total_test_loss/len(TestImgLoader)*100 > max_acc:
+           max_acc = total_test_loss/len(TestImgLoader)*100
+           max_epo = epoch
+       print('MAX epoch %d total test error = %.3f' %(max_epo, max_acc))
+
+       #SAVE
+       savefilename = args.savemodel+'finetune_'+str(epoch)+'.tar'
+       torch.save({
 		    'epoch': epoch,
 		    'state_dict': model.state_dict(),
 		    'train_loss': total_train_loss/len(TrainImgLoader),
 		    'test_loss': total_test_loss/len(TestImgLoader)*100,
 		}, savefilename)
-	
-        print('full finetune time = %.2f HR' %((time.time() - start_full_time)/3600))
-	print(max_epo)
-	print(max_acc)
+
+       print('full finetune time = %.2f HR' %((time.time() - start_full_time)/3600))
+
+    print(max_epo)
+    print(max_acc)
+    writer.close()
 
 
 if __name__ == '__main__':

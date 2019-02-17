@@ -2,8 +2,8 @@ import torch
 import torchvision.transforms as transforms
 import random
 
-__imagenet_stats = {'mean': [0.485, 0.456, 0.406],
-                   'std': [0.229, 0.224, 0.225]}
+__imagenet_stats = {'mean': [0.21276975, 0.24060462, 0.21573123],
+                   'std': [0.18934937, 0.20215742, 0.2023964]}
 
 #__imagenet_stats = {'mean': [0.5, 0.5, 0.5],
 #                   'std': [0.5, 0.5, 0.5]}
@@ -58,6 +58,7 @@ def inception_preproccess(input_size, normalize=__imagenet_stats):
         transforms.ToTensor(),
         transforms.Normalize(**normalize)
     ])
+
 def inception_color_preproccess(input_size, normalize=__imagenet_stats):
     return transforms.Compose([
         #transforms.RandomSizedCrop(input_size),
@@ -73,6 +74,8 @@ def inception_color_preproccess(input_size, normalize=__imagenet_stats):
     ])
 
 
+
+
 def get_transform(name='imagenet', input_size=None,
                   scale_size=None, normalize=None, augment=True):
     normalize = __imagenet_stats
@@ -82,6 +85,7 @@ def get_transform(name='imagenet', input_size=None,
     else:
             return scale_crop(input_size=input_size,
                               scale_size=scale_size, normalize=normalize)
+
 
 
 
@@ -177,3 +181,5 @@ class ColorJitter(RandomOrder):
             self.transforms.append(Contrast(contrast))
         if saturation != 0:
             self.transforms.append(Saturation(saturation))
+
+
