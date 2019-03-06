@@ -181,8 +181,12 @@ def adjust_learning_rate(optimizer, epoch):
 
 def main():
 
-    max_acc=0
-    max_epo=0
+    #max_acc=0
+    #max_epo=0
+
+    min_Loss = 10000.0
+    min_epoch = 0;
+
     start_full_time = time.time()
     writer = SummaryWriter('runs')
     for epoch in range(1, args.epochs+1):
@@ -200,8 +204,12 @@ def main():
        print('epoch %d total training loss = %.3f' %(epoch, total_train_loss/len(TrainImgLoader)))
        writer.add_scalar('train_loss', total_train_loss / len(TrainImgLoader), epoch)
 
+       if (total_train_loss/len(TrainImgLoader)) < min_Loss:
+           min_Loss = total_train_loss/len(TrainImgLoader)
+           min_epoch = epoch
+
        ## Test ##
-       for batch_idx, (imgL, imgR, disp_L) in enumerate(TestImgLoader):
+       '''for batch_idx, (imgL, imgR, disp_L) in enumerate(TestImgLoader):
            test_loss = test(imgL,imgR, disp_L)
            print('Iter %d 3-px error in val = %.3f' %(batch_idx, test_loss*100))
            total_test_loss += test_loss
@@ -211,7 +219,7 @@ def main():
        if total_test_loss/len(TestImgLoader)*100 > max_acc:
            max_acc = total_test_loss/len(TestImgLoader)*100
            max_epo = epoch
-       print('MAX epoch %d total test error = %.3f' %(max_epo, max_acc))
+       print('MAX epoch %d total test error = %.3f' %(max_epo, max_acc))'''
 
        #SAVE
        savefilename = args.savemodel+'finetune_'+str(epoch)+'.tar'
@@ -224,8 +232,9 @@ def main():
 
        print('full finetune time = %.2f HR' %((time.time() - start_full_time)/3600))
 
-    print(max_epo)
-    print(max_acc)
+    #print(max_epo)
+    #print(max_acc)
+    print('min_loss epoch = %d' % (min_epoch))
     writer.close()
 
 

@@ -66,8 +66,8 @@ class myImageFloder(data.Dataset):
 
         if self.training:  
            w, h = left_img.size
-           #th, tw = 512, 512
-           th, tw = 256,256
+           th, tw = 512, 512
+           #th, tw = 256,256
 
  
            x1 = random.randint(0, w - tw)
@@ -77,7 +77,7 @@ class myImageFloder(data.Dataset):
            left_img = left_img.crop((x1, y1, x1 + tw, y1 + th))
            right_img = right_img.crop((x1, y1, x1 + tw, y1 + th))
 
-           dataL = dataL[y1:y1 + th, x1:x1 + tw]
+
 
 
            '''bands = len(left_img.getbands())

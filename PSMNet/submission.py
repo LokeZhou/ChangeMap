@@ -153,7 +153,7 @@ def main():
        else:
            img = pred_disp[top_pad:,:-left_pad]
 
-
+       img = np.around(img,1)
 
        skimage.io.imsave(test_left_img[inx].split('/')[-1],(img*255).astype('uint8'))
 

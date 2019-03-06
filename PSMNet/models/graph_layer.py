@@ -114,9 +114,14 @@ class PSMNet(nn.Module):
                                        nn.ReLU(inplace=True)
                                        )
 
+
         after_normalized = nn.Sequential(nn.BatchNorm3d(1),
                                        nn.ReLU(inplace=True)
                                        )
+
+        if self.cudaenable == True:
+            pre_normalized = nn.DataParallel(pre_normalized)
+            after_normalized = nn.DataParallel(after_normalized)
 
         refimg_fea = pre_normalized(refimg_fea)
         targetimg_fea = pre_normalized(targetimg_fea)
@@ -141,8 +146,10 @@ class PSMNet(nn.Module):
         cost = cost.contiguous()
 
 
+
         cost0 = self.dres0(cost)
         cost0 = self.dres1(cost0) + cost0
+
 
 
         out1, pre1, post1 = self.dres2(cost0, None, None)
@@ -172,8 +179,10 @@ class PSMNet(nn.Module):
             cost1 = torch.squeeze(cost1, 1)
             pred1 = torch.mean(cost1, 1)
 
+
             cost2 = torch.squeeze(cost2, 1)
             pred2 = torch.mean(cost2, 1)
+
 
 
         cost3 = F.upsample(cost3, [2, left.size()[2], left.size()[3]], mode='trilinear')

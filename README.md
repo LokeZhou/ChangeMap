@@ -14,20 +14,20 @@ Train
 As an example, use the following command to train a PSMNet on Your Dataset:
 
 preTrain
-
+cd PSMNet
 python main.py --maxdisp 4 \
-               --model stackhourglass \
+               --model graphLayer \
                --datapath (your data folder)\
                --trainbatchsize 5
                --testbatchsize 8
-               --epochs 10 \
+               --epochs 100 \
                —-enablecuda True \ 
                --savemodel (path for saving model)
                
 fineTrain
 
 python finetune.py --maxdisp 4 \
-              --model stackhourglass \
+              --model graphLayer \
               --datapath (your fine data folder)
              --savemodel (path for saving model)
              --epochs 300
@@ -57,9 +57,9 @@ Tip:
 
 Evaluation
 Use the following command to evaluate the trained PSMNet on Your test data:
-
-python submission.py --maxdisp 192 \
-                     --model stackhourglass \
+cd PSMNet
+python submission.py  
+                     --model graphLayer \
                      --enablecuda True \
                      --datapath (your test data folder) \
                      --loadmodel (finetuned PSMNet) \
